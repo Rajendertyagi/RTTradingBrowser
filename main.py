@@ -1,157 +1,143 @@
 import sys
 import os
-from PyQt6.QtCore import QUrl, Qt, QSize
+from PyQt6.QtCore import QUrl, Qt, QPoint
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
-                             QWidget, QLineEdit, QTabWidget, QPushButton, QToolButton)
+                             QWidget, QLineEdit, QTabWidget, QPushButton, QMenu)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineUrlRequestInterceptor
-from PyQt6.QtGui import QShortcut, QKeySequence
+from PyQt6.QtGui import QShortcut, QKeySequence, QAction
 
-# Chrome UI Styling (QSS)
+# Professional Chrome Theme
 STYLESHEET = """
     QMainWindow { background-color: #202124; }
     
-    QTabWidget::pane { border: none; top: -1px; background-color: #ffffff; }
-    
+    /* Tab Bar at the very top */
+    QTabWidget::pane { border: none; background-color: #ffffff; }
     QTabBar::tab {
         background: #202124;
         color: #9aa0a6;
-        padding: 8px 20px;
-        margin-right: 2px;
+        padding: 10px 20px;
         border-top-left-radius: 8px;
         border-top-right-radius: 8px;
-        min-width: 120px;
+        min-width: 150px;
     }
+    QTabBar::tab:selected { background: #35363a; color: #ffffff; }
+    QTabBar::tab:hover:!selected { background: #2d2e31; }
 
-    QTabBar::tab:selected {
-        background: #ffffff;
-        color: #3c4043;
-    }
-
-    QTabBar::tab:hover:!selected {
-        background: #2d2e31;
-    }
-
+    /* Address Bar Area (Below Tabs) */
+    #NavBar { background-color: #35363a; border-bottom: 1px solid #202124; padding: 5px; }
+    
     QLineEdit {
-        background-color: #f1f3f4;
-        color: #202124;
-        border-radius: 14px;
+        background-color: #202124;
+        color: #e8eaed;
+        border-radius: 15px;
         padding: 5px 15px;
-        border: 1px solid #dfe1e5;
-        font-size: 13px;
-        margin: 5px 10px;
+        border: 1px solid #5f6368;
     }
 
-    QLineEdit:focus {
-        background-color: #ffffff;
-        border: 1px solid #8ab4f8;
-        box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3);
-    }
+    /* Colorful Buttons */
+    #BackBtn { color: #ea4335; font-weight: bold; }
+    #FwdBtn { color: #34a853; font-weight: bold; }
+    #HomeBtn { color: #4285f4; font-weight: bold; }
+    #AddTabBtn { color: #fbbc05; font-weight: bold; font-size: 20px; margin-left: 5px; }
     
-    #NavWidget { background-color: #ffffff; border-bottom: 1px solid #dfe1e5; }
-    
-    QPushButton {
-        border: none;
-        border-radius: 14px;
-        background: transparent;
-        color: #5f6368;
-        font-size: 18px;
-        width: 28px;
-        height: 28px;
-    }
-    
-    QPushButton:hover { background-color: #f1f3f4; }
+    QPushButton { border: none; background: transparent; font-size: 16px; width: 30px; }
+    QPushButton:hover { background-color: #494c4e; border-radius: 15px; }
+
+    /* Right Click Menu Style */
+    QMenu { background-color: #2b2b2b; color: white; border: 1px solid #555; }
+    QMenu::item:selected { background-color: #4285f4; }
 """
-
-class AdBlockInterceptor(QWebEngineUrlRequestInterceptor):
-    def interceptRequest(self, info):
-        url = info.requestUrl().toString().lower()
-        blocks = ["doubleclick", "ads", "analytics", "tracking", "telemetry"]
-        if any(b in url for b in blocks):
-            info.block(True)
 
 class RTTrading(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("RTTrading")
-        self.setMinimumSize(1024, 768)
         
-        # Interceptor for uBlock-style blocking
-        self.interceptor = AdBlockInterceptor()
-        QWebEngineProfile.defaultProfile().setUrlRequestInterceptor(self.interceptor)
-
-        # Container
         self.central_widget = QWidget()
-        self.main_layout = QVBoxLayout(self.central_widget)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(0)
+        self.layout = QVBoxLayout(self.central_widget)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
         self.setCentralWidget(self.central_widget)
 
-        # 1. Tab Bar
+        # 1. TABS AT TOP
         self.tabs = QTabWidget()
         self.tabs.setTabsClosable(True)
         self.tabs.setMovable(True)
         self.tabs.setDocumentMode(True)
         self.tabs.tabCloseRequested.connect(self.close_tab)
         
-        # 2. Navigation Bar (Chrome White Bar)
-        self.nav_widget = QWidget()
-        self.nav_widget.setObjectName("NavWidget")
-        nav_layout = QHBoxLayout(self.nav_widget)
-        nav_layout.setContentsMargins(5, 0, 5, 0)
+        # Custom Right Click for Tabs
+        self.tabs.tabBar().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tabs.tabBar().customContextMenuRequested.connect(self.show_tab_menu)
 
-        self.back_btn = QPushButton("←")
-        self.fwd_btn = QPushButton("→")
-        self.reload_btn = QPushButton("↻")
+        # 2. ADDRESS BAR BELOW TABS
+        self.nav_bar = QWidget()
+        self.nav_bar.setObjectName("NavBar")
+        nav_layout = QHBoxLayout(self.nav_bar)
+        
+        self.back_btn = QPushButton("←"); self.back_btn.setObjectName("BackBtn")
+        self.fwd_btn = QPushButton("→"); self.fwd_btn.setObjectName("FwdBtn")
+        self.home_btn = QPushButton("🏠"); self.home_btn.setObjectName("HomeBtn")
+        self.add_tab_btn = QPushButton("+"); self.add_tab_btn.setObjectName("AddTabBtn")
         
         self.url_bar = QLineEdit()
         self.url_bar.returnPressed.connect(self.navigate_to_url)
 
         nav_layout.addWidget(self.back_btn)
         nav_layout.addWidget(self.fwd_btn)
-        nav_layout.addWidget(self.reload_btn)
+        nav_layout.addWidget(self.home_btn)
         nav_layout.addWidget(self.url_bar)
+        nav_layout.addWidget(self.add_tab_btn)
 
-        # Assemble
-        self.main_layout.addWidget(self.tabs)
-        self.main_layout.addWidget(self.nav_widget)
+        # Assembly
+        self.layout.addWidget(self.tabs)
+        self.layout.addWidget(self.nav_bar)
 
-        # Connections
+        # Logic
+        self.add_tab_btn.clicked.connect(lambda: self.add_new_tab("https://www.tradingview.com"))
         self.back_btn.clicked.connect(lambda: self.current_browser().back())
         self.fwd_btn.clicked.connect(lambda: self.current_browser().forward())
-        self.reload_btn.clicked.connect(lambda: self.current_browser().reload())
+        self.home_btn.clicked.connect(lambda: self.current_browser().setUrl(QUrl("https://www.tradingview.com")))
 
-        # Chrome Shortcuts
-        self.setup_shortcuts()
-
-        # Theme Application
         self.setStyleSheet(STYLESHEET)
-
-        # Start
         self.add_new_tab("https://www.tradingview.com/chart")
         self.showMaximized()
 
-    def setup_shortcuts(self):
-        QShortcut("Ctrl+T", self).activated.connect(lambda: self.add_new_tab("https://www.google.com"))
-        QShortcut("Ctrl+W", self).activated.connect(lambda: self.close_tab(self.tabs.currentIndex()))
-        QShortcut("Ctrl+L", self).activated.connect(self.url_bar.setFocus)
-        QShortcut("Ctrl+R", self).activated.connect(lambda: self.current_browser().reload())
-        QShortcut("F5", self).activated.connect(lambda: self.current_browser().reload())
-        QShortcut("Ctrl+Tab", self).activated.connect(lambda: self.tabs.setCurrentIndex((self.tabs.currentIndex() + 1) % self.tabs.count()))
+    def show_tab_menu(self, position):
+        index = self.tabs.tabBar().tabAt(position)
+        if index == -1: return
+        
+        menu = QMenu()
+        # Screenshot Options Implementation
+        menu.addAction("New tab to the right").triggered.connect(lambda: self.add_new_tab())
+        menu.addAction("Add tab to new split view")
+        menu.addAction("Add tab to new group")
+        menu.addSeparator()
+        menu.addAction("Reload (Ctrl+R)").triggered.connect(self.current_browser().reload)
+        menu.addAction("Duplicate").triggered.connect(lambda: self.add_new_tab(self.current_browser().url().toString()))
+        menu.addAction("Pin")
+        menu.addAction("Mute site").triggered.connect(lambda: self.current_browser().page().setAudioMuted(True))
+        menu.addSeparator()
+        menu.addAction("Close (Ctrl+W)").triggered.connect(lambda: self.close_tab(index))
+        menu.addAction("Close other tabs").triggered.connect(lambda: self.close_others(index))
+        
+        menu.exec(self.tabs.tabBar().mapToGlobal(position))
 
-    def add_new_tab(self, url):
+    def add_new_tab(self, url="https://www.google.com"):
         browser = QWebEngineView()
         index = self.tabs.addTab(browser, "New Tab")
         self.tabs.setCurrentIndex(index)
         browser.setUrl(QUrl(url))
         browser.titleChanged.connect(lambda t: self.tabs.setTabText(self.tabs.indexOf(browser), t[:15]))
-        browser.urlChanged.connect(lambda q: self.url_bar.setText(q.toString()) if self.tabs.currentWidget() == browser else None)
+        browser.urlChanged.connect(lambda q: self.url_bar.setText(q.toString()))
 
-    def current_browser(self):
-        return self.tabs.currentWidget()
-
-    def close_tab(self, index):
-        if self.tabs.count() > 1: self.tabs.removeTab(index)
+    def current_browser(self): return self.tabs.currentWidget()
+    def close_tab(self, index): self.tabs.removeTab(index) if self.tabs.count() > 1 else None
+    
+    def close_others(self, index):
+        for i in reversed(range(self.tabs.count())):
+            if i != index: self.tabs.removeTab(i)
 
     def navigate_to_url(self):
         url = self.url_bar.text().strip()
