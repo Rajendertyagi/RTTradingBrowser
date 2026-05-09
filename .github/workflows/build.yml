@@ -1,4 +1,4 @@
-name: Build Trading Browser
+name: Build RTTrading Browser
 on: [push]
 
 jobs:
@@ -15,14 +15,15 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install -r requirements.txt
+          pip install PyQt6 PyQt6-WebEngine pyinstaller
 
       - name: Build EXE
         run: |
-          pyinstaller --noconsole --onefile main.py
+          # The --name flag ensures the file is RTTrading.exe
+          pyinstaller --noconsole --onefile --name "RTTrading" main.py
 
       - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: LiteTrade-Browser-Windows
-          path: dist/main.exe
+          name: RTTrading-Windows-Build
+          path: dist/RTTrading.exe
