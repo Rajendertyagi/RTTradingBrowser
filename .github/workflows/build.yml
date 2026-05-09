@@ -1,4 +1,4 @@
-name: Build RTTrading Browser
+name: Build Lite RTTrading
 on: [push]
 
 jobs:
@@ -13,17 +13,23 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: Install Tools
         run: |
           pip install PyQt6 PyQt6-WebEngine pyinstaller
+          # Download UPX for compression
+          choco install upx
 
-      - name: Build EXE
+      - name: Build Optimized EXE
         run: |
-          # The --name flag ensures the file is RTTrading.exe
-          pyinstaller --noconsole --onefile --name "RTTrading" main.py
+          pyinstaller --noconsole --onefile --clean --upx-dir "C:\ProgramData\chocolatey\lib\upx\tools\upx-4.2.4-win64" `
+          --exclude-module PyQt6.QtSql `
+          --exclude-module PyQt6.QtTest `
+          --exclude-module PyQt6.QtXml `
+          --exclude-module tkinter `
+          --name "RTTrading" main.py
 
-      - name: Upload Result
+      - name: Upload Smallest Build
         uses: actions/upload-artifact@v4
         with:
-          name: RTTrading-Windows-Build
+          name: RTTrading-UltraLite
           path: dist/RTTrading.exe
